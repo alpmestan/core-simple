@@ -73,4 +73,5 @@ ghcCoreFor ghcVer haskellCode optLevel modName hsFilesDir = do
           haskellModule = "module " `T.append` modName `T.append` " where \n"
                                     `T.append` haskellCode
           
-          cleanUp = flip T.snoc '\n' . T.tail . T.dropWhile (/= '\n') . T.reverse . T.tail . T.tail . T.dropWhile (/= '\n') . T.tail . T.dropWhile (/= '\n') . T.tail . T.dropWhile (/= '\n') . T.reverse . T.tail . T.dropWhile (/= '\n') . T.tail . T.dropWhile (/= '\n') . T.tail . T.dropWhile (/= '\n')
+          cleanUp = T.init . T.init . T.init . T.init -- removes 4 `\n' at the end
+                  . T.unlines . drop 5 . T.lines -- removes first 5 useless lines
