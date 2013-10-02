@@ -16,6 +16,32 @@ import System.Process
 import qualified Data.Text.Lazy    as T
 import qualified Data.Text.Lazy.IO as T
 
+{- | 
+-}
+data CoreOutputOpt = DSuppressIdInfo
+                   | DSuppressCoercions
+                   | DSuppressTypeApplications
+                   | DSuppressUniques
+                   | DSuppressModulePrefixes
+  deriving Eq
+
+instance Show CoreOutputOpt where
+    show DSuppressIdInfo           = "-dsuppress-idinfo"
+    show DSuppressCoercions        = "-dsuppress-coercions"
+    show DSuppressTypeApplications = "-dsuppress-type-applications"
+    show DSuppressUniques          = "-dsuppress-uniques"
+    show DSuppressModulePrefixes   = "-dsuppress-module-prefixes"
+
+defaultCoreOutputOpts :: [CoreOutputOpt]
+defaultCoreOutputOpts = [ DSuppressIdInfo
+                        , DSuppressCoercions
+                        , DSuppressTypeApplications
+                        , DSuppressUniques
+                        , DSuppressModulePrefixes ]
+
+formatCoreOutputOpts :: [CoreOutputOpt] -> String
+formatCoreOutputOpts = unwords . map show
+
 -- | ghc -O0, -O1 and -O2
 data OptLevel = O0 | O1 | O2
 
@@ -45,8 +71,10 @@ type HaskellCode = Text
 --   using the 'ModuleName' argument for the name: modName.hs
 --   and inserts "module <modName> where" at the beginning of the haskell code
 --   The optLevel switch lets you build with either -O0, -O1 or -O2.
-ghcCoreFor :: GHCVersion -> HaskellCode -> OptLevel -> ModuleName -> FilePath -> IO (Either GHCCoreError GeneratedCore)
-ghcCoreFor ghcVer haskellCode optLevel modName hsFilesDir = do
+--   Good default for coreOutputOpts is
+--     
+ghcCoreFor :: GHCVersion -> OptLevel -> [CoreOutputOpt]-> HaskellCode -> ModuleName -> FilePath -> IO (Either GHCCoreError GeneratedCore)
+ghcCoreFor ghcVer optLevel coreOutputOpts haskellCode modName hsFilesDir = do
     T.writeFile hsFilePath haskellModule
     (exitStatus, out, err) <- readProcessWithExitCode ghc args ""
     case exitStatus of
@@ -63,9 +91,8 @@ ghcCoreFor ghcVer haskellCode optLevel modName hsFilesDir = do
                       ++ " " 
                       ++ hsFilePath    -- absolute (?) file path to where 
                                        -- we should write the code
-                      ++ " -ddump-simpl -dsuppress-idinfo -dsuppress-coercions \
-                         \ -dsuppress-type-applications -dsuppress-uniques \
-                         \ -dsuppress-module-prefixes"
+                      ++ " -ddump-simpl "
+                      ++ formatCoreOutputOpts coreOutputOpts
                            
           ghc  = "ghc-" ++ T.unpack ghcVer
           hsFilePath = hsFilesDir </> hsFileName
@@ -74,4 +101,4 @@ ghcCoreFor ghcVer haskellCode optLevel modName hsFilesDir = do
                                     `T.append` haskellCode
           
           cleanUp = T.init . T.init . T.init . T.init -- removes 4 `\n' at the end
-                  . T.unlines . drop 5 . T.lines -- removes first 5 useless lines
+                  . T.unlines . drop 5 . T.lines      -- removes first 5 useless lines
