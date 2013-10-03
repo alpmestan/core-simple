@@ -1,12 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Core.Simple ( ghcCoreFor
-                   , OptLevel
+                   , OptLevel(..)
                    , GHCVersion
                    , ModuleName
                    , GHCCoreError
                    , GeneratedCore
-                   , HaskellCode   ) where
+                   , HaskellCode
+                   , CoreOutputOpt(..)
+                   , defaultCoreOutputOpts ) where
 
 import Data.Text.Lazy            (Text)
 import System.Exit
@@ -18,11 +20,11 @@ import qualified Data.Text.Lazy.IO as T
 
 {- | 
 -}
-data CoreOutputOpt = DSuppressIdInfo
-                   | DSuppressCoercions
-                   | DSuppressTypeApplications
-                   | DSuppressUniques
-                   | DSuppressModulePrefixes
+data CoreOutputOpt = DSuppressIdInfo           -- ^ Remove id information
+                   | DSuppressCoercions        -- ^ Omit the coercions
+                   | DSuppressTypeApplications -- ^ Omit the type applications
+                   | DSuppressUniques          -- ^ Don't use unique names
+                   | DSuppressModulePrefixes   -- ^ Don't show module prefixes before an identifier
   deriving Eq
 
 instance Show CoreOutputOpt where
@@ -32,6 +34,8 @@ instance Show CoreOutputOpt where
     show DSuppressUniques          = "-dsuppress-uniques"
     show DSuppressModulePrefixes   = "-dsuppress-module-prefixes"
 
+-- | It's equal to [ DSuppressIdInfo, DSuppressCoercions, DSuppressTypeApplications
+--   , DSuppressUniques, DSuppressModulePrefixes ]
 defaultCoreOutputOpts :: [CoreOutputOpt]
 defaultCoreOutputOpts = [ DSuppressIdInfo
                         , DSuppressCoercions
@@ -43,14 +47,16 @@ formatCoreOutputOpts :: [CoreOutputOpt] -> String
 formatCoreOutputOpts = unwords . map show
 
 -- | ghc -O0, -O1 and -O2
-data OptLevel = O0 | O1 | O2
+data OptLevel = O0 -- ^ ghc -O0 ...
+              | O1 -- ^ ghc -O1 ...
+              | O2 -- ^ ghc -O2 ...
 
 instance Show OptLevel where
     show O0 = "-O0"
     show O1 = "-O1"
     show O2 = "-O2"
 
--- | ghc version, e.g "7.6.3"
+-- | ghc version, e.g \"7.6.3\"
 type GHCVersion = Text
 
 -- | Synonym for 'Text'
@@ -67,13 +73,13 @@ type HaskellCode = Text
 
 -- | Runs the given GHC version by calling out to ghc-<ghcVer>, which must be
 --   in the PATH environment variable
---   It writes the given haskell code in a file in the given directory (last argument)
---   using the 'ModuleName' argument for the name: modName.hs
---   and inserts "module <modName> where" at the beginning of the haskell code
---   The optLevel switch lets you build with either -O0, -O1 or -O2.
---   Good default for coreOutputOpts is
---     
-ghcCoreFor :: GHCVersion -> OptLevel -> [CoreOutputOpt]-> HaskellCode -> ModuleName -> FilePath -> IO (Either GHCCoreError GeneratedCore)
+ghcCoreFor :: GHCVersion      -- ^ GHC version to use, e.g \"7.6.3\"
+           -> OptLevel        -- ^ 'O0', 'O1' or 'O2'
+           -> [CoreOutputOpt] -- ^ Control the output, see 'CoreOutputOpt'. See 'defaultCoreOutputOpts'
+           -> HaskellCode     -- ^ Text of your Haskell code
+           -> ModuleName      -- ^ Choose a name for the module
+           -> FilePath        -- ^ Directory to write the haskell code in
+           -> IO (Either GHCCoreError GeneratedCore) -- ^ Text of the error or Core code
 ghcCoreFor ghcVer optLevel coreOutputOpts haskellCode modName hsFilesDir = do
     T.writeFile hsFilePath haskellModule
     (exitStatus, out, err) <- readProcessWithExitCode ghc args ""
